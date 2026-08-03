@@ -1,0 +1,61 @@
+[build-system]
+requires = ["hatchling>=1.21,<2.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "pyassist"
+version = "0.1.0"
+description = "A beautiful terminal AI assistant: Textual TUI, OpenAI-compatible APIs, tools, plugins and local memory."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "pyassist contributors" }]
+keywords = ["tui", "textual", "openai", "llm", "assistant", "cli"]
+classifiers = [
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Utilities",
+]
+
+dependencies = [
+  "textual>=1.0,<4.0",
+  "httpx>=0.27,<1.0",
+  "aiosqlite>=0.20,<1.0",
+  "platformdirs>=4.0,<5.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0,<9.0",
+  "pytest-asyncio>=0.24,<2.0",
+  "respx>=0.21,<1.0",
+  "textual-dev>=1.6,<2.0",
+]
+
+[project.scripts]
+pyassist = "pyassist.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/example/pyassist"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/pyassist"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+filterwarnings = ["ignore::DeprecationWarning"]
+# auto mode: every `async def test_` runs without a per-test marker.
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
