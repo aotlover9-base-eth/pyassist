@@ -75,7 +75,7 @@ async def context(tmp_path: Path):
 
 async def test_app_mounts_and_shows_welcome(context) -> None:
     app = PyAssistApp(context)
-    async with app.run_test() as pilot:
+    async with app.run_test():
         assert app.query(WelcomePanel)
         assert app.conversation is not None
 

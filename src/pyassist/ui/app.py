@@ -16,12 +16,11 @@ import asyncio
 from pathlib import Path
 from typing import Any
 
-from textual import events, work
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.widgets import Footer, Header, ListItem, ListView, Static
 
-from ..config import Config, mask_secret
+from ..config import mask_secret
 from ..core import attachments as attachments_mod
 from ..core.bootstrap import AppContext
 from ..core.events import (
@@ -469,7 +468,17 @@ class PyAssistApp(App[None]):
         self._tool_panels.clear()
         self._set_status("regenerating…")
         try:
-            async for event in self.ctx.engine.regenerate(self.conversation.id):
+            history = await self.ctx.storage.get_messages(self.conversation.id)
+            last_user = next((m for m in reversed(history) if m.role == "user"), None)
+            if last_user is None:
+                await self._mount(NoticePanel("Nothing to regenerate yet.", error=False))
+                return
+            await self.ctx.storage.delete_messages_after(
+                self.conversation.id, last_user.created_at
+            )
+            await self._load_conversation(self.conversation.id)
+
+            async for event in self.ctx.engine._run_turn(self.conversation.id, last_user):
                 await self._handle_event(event)
         finally:
             await self._load_conversation(self.conversation.id)
@@ -725,7 +734,8 @@ class PyAssistApp(App[None]):
             composer = self.query_one(Composer)
             existing = composer.value
             block = f"\n\n```{_suffix(attachment.name)}\n{attachment.content}\n```"
-            composer.text = f"{existing}Contents of {attachment.name}:{block}"
+            sep = "\n\n" if existing.strip() else ""
+            composer.text = f"{existing}{sep}Contents of {attachment.name}:{block}"
 
     def _update_attachment_bar(self) -> None:
         bar = self.query_one("#attachment-bar", Static)

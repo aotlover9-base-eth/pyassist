@@ -10,7 +10,6 @@ import json
 from pathlib import Path
 
 import httpx
-import pytest
 
 from pyassist.config import Config
 from pyassist.core.engine import ChatEngine

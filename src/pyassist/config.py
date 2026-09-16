@@ -14,6 +14,7 @@ Design notes
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 from dataclasses import asdict, dataclass, field, fields
@@ -197,7 +198,5 @@ def mask_secret(secret: str, *, visible: int = 4) -> str:
 
 def _restrict_permissions(path: Path) -> None:
     """Best-effort ``chmod 600``. A no-op on Windows, which is fine."""
-    try:
+    with contextlib.suppress(OSError):
         path.chmod(0o600)
-    except OSError:  # pragma: no cover - platform dependent
-        pass

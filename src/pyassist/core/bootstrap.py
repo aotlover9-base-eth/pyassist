@@ -9,6 +9,7 @@ temp directory in one call.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -53,10 +54,8 @@ class AppContext:
         self.llm = LLMClient(self.config)
         self.engine.llm = self.llm
         # The old client owns a connection pool; closing it is fire-and-forget.
-        try:
+        with contextlib.suppress(RuntimeError):
             asyncio.get_running_loop().create_task(old.aclose())
-        except RuntimeError:  # pragma: no cover - no loop (sync context)
-            pass
 
 
 async def create_app_context(

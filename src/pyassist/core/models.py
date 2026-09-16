@@ -84,6 +84,7 @@ class Attachment:
             "mime_type": self.mime_type,
             "size_bytes": self.size_bytes,
             "kind": self.kind,
+            "content": self.content,
             "truncated": self.truncated,
         }
 
@@ -113,11 +114,14 @@ class Message:
     def to_api(self) -> dict[str, Any]:
         """Convert to an OpenAI ``messages[]`` entry."""
         if self.role == "tool":
-            return {
+            payload = {
                 "role": "tool",
                 "tool_call_id": self.tool_call_id or "",
                 "content": self.content,
             }
+            if self.tool_name:
+                payload["name"] = self.tool_name
+            return payload
 
         payload: dict[str, Any] = {"role": self.role}
 
@@ -154,11 +158,11 @@ class Message:
 
     def char_cost(self) -> int:
         """Rough size used by the history trimmer."""
-        total = len(self.content) + len(self.reasoning)
+        total = len(self.content or "") + len(self.reasoning or "")
         for tc in self.tool_calls:
-            total += len(tc.name) + len(tc.arguments)
+            total += len(tc.name or "") + len(tc.arguments or "")
         for att in self.attachments:
-            total += len(att.content)
+            total += len(att.content or "")
         return total
 
 

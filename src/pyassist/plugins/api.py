@@ -21,8 +21,9 @@ has to import from ``pyassist.core``, so internals can change freely.
 from __future__ import annotations
 
 import logging
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from typing import Any, Awaitable, Callable
+from typing import Any
 
 from ..tools.base import FunctionTool, Tool, ToolContext, ToolRegistry, ToolResult
 

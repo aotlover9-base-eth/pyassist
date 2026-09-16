@@ -20,11 +20,16 @@ at a different address. More on that in Step 5.
 
 ## Step 1 — Open a terminal in the project folder
 
-Press `Win + R`, type `cmd`, press Enter. Then:
+Navigate to wherever you cloned or downloaded `pyassist`:
 
-```cmd
-cd c:\Users\nikhi\Downloads\pyassistent
-```
+- **Windows (cmd / PowerShell)**:
+  ```cmd
+  cd path\to\pyassist
+  ```
+- **macOS / Linux**:
+  ```bash
+  cd path/to/pyassist
+  ```
 
 Your prompt should now show that folder. You'll run everything from here.
 
@@ -32,15 +37,21 @@ Your prompt should now show that folder. You'll run everything from here.
 
 ## Step 2 — Install it
 
-The project already has a virtual environment (a private box for its Python packages,
-so it can't break anything else on your computer). Activate it:
+Set up and activate a virtual environment (a private box for its Python packages so it never interferes with anything else on your machine):
 
-```cmd
-.venv\Scripts\activate
-```
+- **Windows**:
+  ```cmd
+  python -m venv .venv
+  .venv\Scripts\activate
+  ```
+- **macOS / Linux**:
+  ```bash
+  python3 -m venv .venv
+  source .venv/bin/activate
+  ```
 
 You'll see `(.venv)` appear at the start of your prompt. **That's how you know it worked.**
-You need to do this every time you open a new terminal.
+Activate this whenever you open a fresh terminal.
 
 Now install the app itself:
 
@@ -262,23 +273,23 @@ pyassist --debug
 
 If you change the code and want to check you didn't break anything:
 
-```cmd
+```bash
 pytest -q
 ```
 
-All 91 should pass.
+All 100 should pass.
 
 ---
 
 ## Quick reference
 
-```cmd
-cd c:\Users\nikhi\Downloads\pyassistent   :: go to the project
-.venv\Scripts\activate                    :: turn on the environment
-pyassist                                  :: launch it
-pyassist --config                         :: see your settings
-pyassist --set model=gpt-4o               :: change a setting
-pyassist -p "a quick question"            :: one-off question
-pyassist --list-tools                     :: what tools exist
-deactivate                                :: turn the environment off
+```bash
+cd path/to/pyassist                       # go to the project
+source .venv/bin/activate                 # Linux/macOS (.venv\Scripts\activate on Windows)
+pyassist                                  # launch it
+pyassist --config                         # see your settings
+pyassist --set model=gpt-4o               # change a setting
+pyassist -p "a quick question"            # one-off question
+pyassist --list-tools                     # what tools exist
+deactivate                                # turn the environment off
 ```

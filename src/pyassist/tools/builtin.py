@@ -19,7 +19,7 @@ import ipaddress
 import json
 import socket
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -240,7 +240,7 @@ class ShellTool(Tool):
 
         try:
             stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             proc.kill()
             await proc.wait()
             return ToolResult.error(f"command timed out after {timeout:.0f}s")
@@ -435,7 +435,7 @@ class CurrentTimeTool(Tool):
         local = datetime.now().astimezone()
         payload = {
             "local": local.strftime("%Y-%m-%d %H:%M:%S %Z"),
-            "utc": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),
+            "utc": datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC"),
             "timestamp": int(time.time()),
         }
         return ToolResult(

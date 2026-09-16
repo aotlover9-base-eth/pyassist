@@ -35,9 +35,8 @@ from textual.widgets import (
 )
 
 from ..config import Config
-from ..core.models import Conversation, Message
+from ..core.models import Conversation, Message, ToolCall
 from ..tools.base import Tool
-from ..core.models import ToolCall
 
 
 class SettingsScreen(ModalScreen[dict[str, Any] | None]):

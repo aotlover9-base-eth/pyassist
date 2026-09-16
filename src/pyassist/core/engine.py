@@ -21,9 +21,10 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, AsyncIterator, Awaitable, Callable
+from typing import Any
 
 from ..config import Config
 from ..tools.base import Tool, ToolContext, ToolRegistry, ToolResult

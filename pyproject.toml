@@ -18,6 +18,7 @@ classifiers = [
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
   "Topic :: Utilities",
 ]
 
@@ -34,13 +35,16 @@ dev = [
   "pytest-asyncio>=0.24,<2.0",
   "respx>=0.21,<1.0",
   "textual-dev>=1.6,<2.0",
+  "ruff>=0.5.0",
 ]
 
 [project.scripts]
 pyassist = "pyassist.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/example/pyassist"
+Homepage = "https://github.com/aotlover9-base-eth/pyassist"
+Repository = "https://github.com/aotlover9-base-eth/pyassist"
+Issues = "https://github.com/aotlover9-base-eth/pyassist/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/pyassist"]

@@ -16,7 +16,13 @@ from pathlib import Path
 from . import __version__, paths
 from .config import Config, mask_secret
 from .core.bootstrap import create_app_context, setup_logging
-from .core.events import EngineError, TextDelta, ToolCallFinished, ToolCallStarted
+from .core.events import (
+    EngineError,
+    TextDelta,
+    ToolCallDenied,
+    ToolCallFinished,
+    ToolCallStarted,
+)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -39,6 +45,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("-m", "--model", help="override the model for this run")
     parser.add_argument(
         "-w", "--workspace", metavar="DIR", help="workspace root for file tools (default: cwd)"
+    )
+    parser.add_argument(
+        "-y",
+        "--auto-approve",
+        action="store_true",
+        help="automatically approve tool executions without prompting",
     )
     parser.add_argument(
         "--set",
@@ -92,6 +104,8 @@ async def _run(args: argparse.Namespace) -> int:
     config = Config.load()
     if args.model:
         config.model = args.model
+    if args.auto_approve:
+        config.auto_approve_tools = True
 
     workspace = Path(args.workspace).expanduser() if args.workspace else Path.cwd()
     if not workspace.is_dir():
@@ -119,8 +133,7 @@ async def _run(args: argparse.Namespace) -> int:
         await app.run_async()
         return 0
     finally:
-        if args.list_tools or args.list_plugins or args.prompt:
-            await context.aclose()
+        await context.aclose()
 
 
 async def _headless(context, prompt: str) -> int:  # noqa: ANN001
@@ -144,6 +157,8 @@ async def _headless(context, prompt: str) -> int:  # noqa: ANN001
         elif isinstance(event, ToolCallFinished):
             status = "ok" if event.ok else "failed"
             print(f"[{event.call.name}: {status}]", file=sys.stderr)
+        elif isinstance(event, ToolCallDenied):
+            print(f"[{event.call.name}: denied ({event.reason})]", file=sys.stderr)
         elif isinstance(event, EngineError):
             print(f"\nerror: {event.message}", file=sys.stderr)
             if event.detail:
