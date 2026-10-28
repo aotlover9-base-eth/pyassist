@@ -33,11 +33,15 @@ DEFAULT_SYSTEM_PROMPT = (
 
 #: Environment overrides applied on top of the config file, in ``(env var, field)`` form.
 _ENV_OVERRIDES: tuple[tuple[str, str], ...] = (
+    ("PYASSIST_PROVIDER", "provider"),
     ("PYASSIST_API_KEY", "api_key"),
     ("OPENAI_API_KEY", "api_key"),
+    ("ANTHROPIC_API_KEY", "api_key"),
     ("PYASSIST_BASE_URL", "base_url"),
     ("OPENAI_BASE_URL", "base_url"),
+    ("ANTHROPIC_BASE_URL", "base_url"),
     ("PYASSIST_MODEL", "model"),
+    ("ANTHROPIC_MODEL", "model"),
 )
 
 
@@ -46,11 +50,13 @@ class Config:
     """User-facing settings for pyassist."""
 
     # --- connection -----------------------------------------------------
+    provider: str = "auto"
     base_url: str = "https://api.openai.com/v1"
     api_key: str = ""
     model: str = "gpt-4o-mini"
     request_timeout: float = 120.0
     extra_headers: dict[str, str] = field(default_factory=dict)
+    anthropic_version: str = "2023-06-01"
 
     # --- generation -----------------------------------------------------
     system_prompt: str = DEFAULT_SYSTEM_PROMPT
@@ -140,12 +146,40 @@ class Config:
         return config
 
     def apply_env(self, environ: dict[str, str] | None = None) -> None:
-        """Apply ``PYASSIST_*`` / ``OPENAI_*`` overrides in declaration order."""
+        """Apply ``PYASSIST_*`` / ``OPENAI_*`` / ``ANTHROPIC_*`` overrides."""
         env = environ if environ is not None else dict(os.environ)
-        for var, attr in _ENV_OVERRIDES:
-            value = env.get(var)
-            if value:
-                setattr(self, attr, value)
+
+        if prov := env.get("PYASSIST_PROVIDER"):
+            self.provider = prov
+
+        effective = self.resolved_provider
+
+        # Base URL
+        base = env.get("PYASSIST_BASE_URL")
+        if not base:
+            if effective == "anthropic":
+                base = env.get("ANTHROPIC_BASE_URL") or env.get("OPENAI_BASE_URL")
+            else:
+                base = env.get("OPENAI_BASE_URL") or env.get("ANTHROPIC_BASE_URL")
+        if base:
+            self.base_url = base
+
+        # API key
+        key = env.get("PYASSIST_API_KEY")
+        if not key:
+            if effective == "anthropic":
+                key = env.get("ANTHROPIC_API_KEY") or env.get("OPENAI_API_KEY")
+            else:
+                key = env.get("OPENAI_API_KEY") or env.get("ANTHROPIC_API_KEY")
+        if key:
+            self.api_key = key
+
+        # Model
+        m = env.get("PYASSIST_MODEL")
+        if not m and effective == "anthropic":
+            m = env.get("ANTHROPIC_MODEL")
+        if m:
+            self.model = m
 
     def save(self, path: Path | None = None) -> Path:
         """Atomically persist the config with owner-only permissions."""
@@ -170,21 +204,54 @@ class Config:
             setattr(self, f.name, getattr(fresh, f.name))
 
     @property
+    def resolved_provider(self) -> str:
+        """Return 'anthropic' or 'openai' based on explicit setting or URL."""
+        prov = (self.provider or "auto").strip().lower()
+        if prov in ("anthropic", "claude"):
+            return "anthropic"
+        if prov in ("openai", "openai-compatible"):
+            return "openai"
+        if "anthropic.com" in self.base_url.lower():
+            return "anthropic"
+        return "openai"
+
+    @property
     def is_configured(self) -> bool:
         """True when we have enough information to attempt a request.
 
         Local servers (Ollama, llama.cpp, LM Studio, vLLM) usually need no key,
-        so a non-default base URL alone counts as configured.
+        so a non-default base URL alone counts as configured. Anthropic and OpenAI
+        endpoints require an API key.
         """
         if self.api_key.strip():
             return True
+        if self.resolved_provider == "anthropic":
+            return False
         return "api.openai.com" not in self.base_url
 
     def chat_completions_url(self) -> str:
         return f"{self.base_url.rstrip('/')}/chat/completions"
 
     def models_url(self) -> str:
+        if self.resolved_provider == "anthropic":
+            return self.anthropic_models_url()
         return f"{self.base_url.rstrip('/')}/models"
+
+    def anthropic_messages_url(self) -> str:
+        base = self.base_url.rstrip("/")
+        if "api.openai.com" in base:
+            return "https://api.anthropic.com/v1/messages"
+        if base.endswith("/v1"):
+            return f"{base}/messages"
+        return f"{base}/v1/messages"
+
+    def anthropic_models_url(self) -> str:
+        base = self.base_url.rstrip("/")
+        if "api.openai.com" in base:
+            return "https://api.anthropic.com/v1/models"
+        if base.endswith("/v1"):
+            return f"{base}/models"
+        return f"{base}/v1/models"
 
 
 def mask_secret(secret: str, *, visible: int = 4) -> str:

@@ -62,6 +62,9 @@ class SettingsScreen(ModalScreen[dict[str, Any] | None]):
                 id="dialog-hint",
             )
 
+            yield Label("Provider (auto, openai, anthropic)", classes="field-label")
+            yield Input(value=cfg.provider, id="provider", placeholder="auto")
+
             yield Label("Base URL", classes="field-label")
             yield Input(value=cfg.base_url, id="base_url", placeholder="https://api.openai.com/v1")
 
@@ -120,6 +123,7 @@ class SettingsScreen(ModalScreen[dict[str, Any] | None]):
     def _collect(self) -> dict[str, Any]:
         """Read every field back out. Config.from_dict does the coercion."""
         changes: dict[str, Any] = {
+            "provider": self.query_one("#provider", Input).value.strip(),
             "base_url": self.query_one("#base_url", Input).value.strip(),
             "api_key": self.query_one("#api_key", Input).value.strip(),
             "model": self.query_one("#model", Input).value.strip(),

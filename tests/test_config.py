@@ -101,6 +101,48 @@ def test_urls_are_built_correctly() -> None:
     assert config.models_url() == "https://api.example.com/v1/models"
 
 
+def test_anthropic_urls_and_provider_resolution() -> None:
+    # Auto-detection from Anthropic URL
+    cfg_auto = Config(base_url="https://api.anthropic.com/v1/")
+    assert cfg_auto.resolved_provider == "anthropic"
+    assert cfg_auto.anthropic_messages_url() == "https://api.anthropic.com/v1/messages"
+    assert cfg_auto.models_url() == "https://api.anthropic.com/v1/models"
+
+    # Auto-detection from root Anthropic URL
+    cfg_root = Config(base_url="https://api.anthropic.com")
+    assert cfg_root.resolved_provider == "anthropic"
+    assert cfg_root.anthropic_messages_url() == "https://api.anthropic.com/v1/messages"
+    assert cfg_root.anthropic_models_url() == "https://api.anthropic.com/v1/models"
+
+    # Explicit provider overrides
+    cfg_anthropic = Config(provider="anthropic")
+    assert cfg_anthropic.resolved_provider == "anthropic"
+    # When default OpenAI base_url is unchanged, points to Anthropic's official endpoint
+    assert cfg_anthropic.anthropic_messages_url() == "https://api.anthropic.com/v1/messages"
+
+    cfg_openai = Config(provider="openai", base_url="https://api.anthropic.com/v1/")
+    assert cfg_openai.resolved_provider == "openai"
+
+
+def test_anthropic_is_configured_requires_api_key() -> None:
+    assert not Config(provider="anthropic", api_key="").is_configured
+    assert not Config(base_url="https://api.anthropic.com/v1/", api_key="").is_configured
+    assert Config(provider="anthropic", api_key="sk-ant-test").is_configured
+
+
+def test_anthropic_env_overrides() -> None:
+    cfg = Config()
+    cfg.apply_env({
+        "PYASSIST_PROVIDER": "anthropic",
+        "ANTHROPIC_API_KEY": "sk-ant-env",
+        "ANTHROPIC_MODEL": "claude-haiku-5-5",
+    })
+    assert cfg.provider == "anthropic"
+    assert cfg.resolved_provider == "anthropic"
+    assert cfg.api_key == "sk-ant-env"
+    assert cfg.model == "claude-haiku-5-5"
+
+
 def test_paths_respect_env_overrides() -> None:
     # isolated_dirs sets these; just confirm they're honoured.
     assert "config" in str(paths.config_dir())

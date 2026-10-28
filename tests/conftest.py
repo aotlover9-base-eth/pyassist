@@ -28,7 +28,15 @@ def isolated_dirs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
         monkeypatch.setenv(var, str(target))
 
     # Stop a developer's real key leaking into tests.
-    for var in ("OPENAI_API_KEY", "PYASSIST_API_KEY", "OPENAI_BASE_URL", "PYASSIST_BASE_URL"):
+    for var in (
+        "OPENAI_API_KEY",
+        "PYASSIST_API_KEY",
+        "OPENAI_BASE_URL",
+        "PYASSIST_BASE_URL",
+        "ANTHROPIC_API_KEY",
+        "ANTHROPIC_BASE_URL",
+        "PYASSIST_PROVIDER",
+    ):
         monkeypatch.delenv(var, raising=False)
 
     return tmp_path

@@ -8,7 +8,7 @@
   <a href="https://github.com/Textualize/textual"><img src="https://img.shields.io/badge/built%20with-Textual-00d4aa.svg" alt="Built with Textual" /></a>
 </p>
 
-A terminal AI assistant built with **Textual**. Streams responses in real-time, speaks the standard OpenAI API wire protocol (so it works with OpenAI, Groq, OpenRouter, Ollama, LM Studio, vLLM, and more), renders GitHub-flavored Markdown with syntax highlighting, executes sandboxed tools with approval gates, persists chats and durable long-term memory locally in SQLite (WAL + FTS5 search), and supports hot-reloaded plugins.
+A terminal AI assistant built with **Textual**. Streams responses in real-time, natively supports both **Anthropic Claude Messages API** and standard **OpenAI-compatible endpoints** (OpenAI, Groq, OpenRouter, Ollama, LM Studio, vLLM, and more), renders GitHub-flavored Markdown with syntax highlighting, executes sandboxed tools with approval gates, persists chats and durable long-term memory locally in SQLite (WAL + FTS5 search), and supports hot-reloaded plugins.
 
 ```
 ┌ pyassist ─────────────────────────────────────────── gpt-4o-mini ─┐
@@ -73,40 +73,76 @@ pip install -e ".[dev]"
 
 Configure through the interactive Settings modal (`F2` inside the app) or directly from your terminal:
 
+### Native Anthropic Claude API
+
+To use native Anthropic Claude (via the Messages API at `POST /v1/messages`):
+
 ```bash
-pyassist --set api_key=sk-...
-pyassist --set base_url=https://api.openai.com/v1
-pyassist --set model=gpt-4o-mini
+# Set provider, model, and API key
+pyassist --set provider=anthropic
+pyassist --set api_key=sk-ant-api03-...
+pyassist --set model=claude-haiku-5-5
+
+# Or via environment variables
+export ANTHROPIC_API_KEY=sk-ant-api03-...
+export PYASSIST_PROVIDER=anthropic
+export PYASSIST_MODEL=claude-haiku-5-5
 ```
+
+> **Note on Model IDs**: Supported current Anthropic models include `claude-haiku-5-5`, `claude-sonnet-5-5`, `claude-opus-5-5`, `claude-3-7-sonnet-20250219`, `claude-3-5-sonnet-20241022`, and `claude-3-5-haiku-20241022`. Type `/models` inside the app to view all available models.
+
+### OpenAI-Compatible Providers
+
+For OpenAI, Groq, OpenRouter, or local servers (Ollama, LM Studio, vLLM):
+
+```bash
+# OpenAI
+pyassist --set provider=openai
+pyassist --set base_url=https://api.openai.com/v1
+pyassist --set api_key=sk-...
+pyassist --set model=gpt-4o-mini
+
+# Ollama (local)
+pyassist --set provider=openai
+pyassist --set base_url=http://localhost:11434/v1
+pyassist --set model=llama3.2
+```
+
+### Automatic Provider Detection
+
+`pyassist` automatically detects the provider if `provider` is set to `auto` (the default):
+- If `base_url` points to `api.anthropic.com`, it automatically uses the native Anthropic Messages API.
+- Otherwise, it uses the OpenAI Chat Completions API.
+- You can explicitly enforce a provider at any time by setting `provider=anthropic` or `provider=openai`.
 
 ### Environment Variables
 
 Environment variables take precedence over saved settings:
 
-```bash
-# Linux / macOS
-export OPENAI_API_KEY=sk-...
-export OPENAI_BASE_URL=https://api.openai.com/v1
-
-# Windows
-set OPENAI_API_KEY=sk-...
-set OPENAI_BASE_URL=https://api.openai.com/v1
-```
+| Variable | Target Setting |
+| :--- | :--- |
+| `ANTHROPIC_API_KEY` | `api_key` (when using Anthropic) |
+| `OPENAI_API_KEY` | `api_key` (when using OpenAI) |
+| `PYASSIST_API_KEY` | `api_key` (overrides all) |
+| `ANTHROPIC_BASE_URL` | `base_url` (when using Anthropic) |
+| `OPENAI_BASE_URL` | `base_url` (when using OpenAI) |
+| `PYASSIST_BASE_URL` | `base_url` (overrides all) |
+| `PYASSIST_MODEL` | `model` |
+| `PYASSIST_PROVIDER` | `provider` (`anthropic`, `openai`, `auto`) |
 
 ### Supported Providers
 
-Point `base_url` to your preferred server:
+| Provider | Protocol | Default `base_url` | API Key Required? |
+| :--- | :--- | :--- | :--- |
+| **Anthropic** | Native Messages API | `https://api.anthropic.com/v1/` | Yes (`sk-ant-...`) |
+| **OpenAI** | Chat Completions | `https://api.openai.com/v1` | Yes (`sk-...`) |
+| **Groq** | Chat Completions | `https://api.groq.com/openai/v1` | Yes (`gsk_...`) |
+| **OpenRouter** | Chat Completions | `https://openrouter.ai/api/v1` | Yes (`sk-or-...`) |
+| **Ollama** | Chat Completions | `http://localhost:11434/v1` | No |
+| **LM Studio** | Chat Completions | `http://localhost:1234/v1` | No |
+| **vLLM** | Chat Completions | `http://localhost:8000/v1` | No |
 
-| Provider | `base_url` | API Key Required? |
-| :--- | :--- | :--- |
-| **OpenAI** | `https://api.openai.com/v1` | Yes (`sk-...`) |
-| **Groq** | `https://api.groq.com/openai/v1` | Yes (`gsk_...`) |
-| **OpenRouter** | `https://openrouter.ai/api/v1` | Yes (`sk-or-...`) |
-| **Ollama** | `http://localhost:11434/v1` | No (or dummy `ollama`) |
-| **LM Studio** | `http://localhost:1234/v1` | No |
-| **vLLM** | `http://localhost:8000/v1` | No |
-
-> 🔒 **Security Notice**: Your API key is stored locally in `config.json` with restricted permissions (`chmod 600` on POSIX systems). If you prefer not to persist secrets to disk, use the `OPENAI_API_KEY` environment variable.
+> 🔒 **Security Notice**: Your API key is stored locally in `config.json` with restricted permissions (`chmod 600` on POSIX systems). If you prefer not to persist secrets to disk, use environment variables (`ANTHROPIC_API_KEY` or `OPENAI_API_KEY`).
 
 ---
 
@@ -188,7 +224,11 @@ src/pyassist/
 │   ├── models.py        # Message, Conversation, ToolCall, Attachment, Usage
 │   ├── storage.py       # Async SQLite (WAL, migrations, FTS5 full-text search)
 │   ├── memory.py        # Long-term facts injected into system prompt
-│   ├── llm.py           # OpenAI-compatible SSE streaming client
+│   ├── llm.py           # Provider-agnostic LLM client interface
+│   ├── providers/       # Clean provider implementations
+│   │   ├── base.py      # BaseProvider ABC, ChatResult, StreamChunk, LLMError
+│   │   ├── openai.py    # OpenAI-compatible /chat/completions provider
+│   │   └── anthropic.py # Native Anthropic Messages API provider
 │   ├── engine.py        # Core agent loop: orchestrates streaming & tool loops
 │   ├── events.py        # Decoupled dataclass events consumed by frontends
 │   ├── attachments.py   # Inlines text files & encodes vision images to data URLs

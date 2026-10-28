@@ -412,3 +412,106 @@ async def test_message_completed_event_carries_final_message(storage, workspace:
     completed = [e for e in events if isinstance(e, MessageCompleted)]
     assert completed
     assert completed[-1].message.content == "all done"
+
+
+def _anthropic_sse(*events: dict) -> bytes:
+    lines = []
+    for event in events:
+        etype = event.get("type", "")
+        if etype:
+            lines.append(f"event: {etype}\n")
+        lines.append(f"data: {json.dumps(event)}\n\n")
+    return "".join(lines).encode()
+
+
+async def test_engine_full_turn_with_anthropic(storage, workspace: Path) -> None:
+    """End-to-end engine loop with native Anthropic provider and tool calling."""
+    # Turn 1: Claude decides to call the echo tool
+    body_turn1 = _anthropic_sse(
+        {"type": "message_start", "message": {"id": "m1", "usage": {"input_tokens": 15}}},
+        {
+            "type": "content_block_start",
+            "index": 0,
+            "content_block": {"type": "tool_use", "id": "call_echo_1", "name": "echo", "input": {}},
+        },
+        {
+            "type": "content_block_delta",
+            "index": 0,
+            "delta": {"type": "input_json_delta", "partial_json": '{"text": "world"}'},
+        },
+        {"type": "content_block_stop", "index": 0},
+        {
+            "type": "message_delta",
+            "delta": {"stop_reason": "tool_use"},
+            "usage": {"output_tokens": 10},
+        },
+        {"type": "message_stop"},
+    )
+
+    # Turn 2: Claude answers with the tool's result
+    body_turn2 = _anthropic_sse(
+        {"type": "message_start", "message": {"id": "m2", "usage": {"input_tokens": 25}}},
+        {"type": "content_block_start", "index": 0, "content_block": {"type": "text", "text": ""}},
+        {
+            "type": "content_block_delta",
+            "index": 0,
+            "delta": {"type": "text_delta", "text": "Echoed: world"},
+        },
+        {"type": "content_block_stop", "index": 0},
+        {
+            "type": "message_delta",
+            "delta": {"stop_reason": "end_turn"},
+            "usage": {"output_tokens": 5},
+        },
+        {"type": "message_stop"},
+    )
+
+    responses = [body_turn1, body_turn2]
+    requests: list[dict] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(json.loads(request.content))
+        body = responses.pop(0) if responses else b""
+        return httpx.Response(200, content=body, headers={"content-type": "text/event-stream"})
+
+    config = Config(
+        provider="anthropic",
+        api_key="sk-ant-test",
+        base_url="https://api.anthropic.com/v1/",
+        model="claude-haiku-5-5",
+    )
+    registry = ToolRegistry()
+    registry.register(EchoTool())
+
+    llm = LLMClient(config, httpx.AsyncClient(transport=httpx.MockTransport(handler)))
+    engine = ChatEngine(config, storage, llm, registry, workspace=workspace)
+
+    convo = await storage.create_conversation()
+    events = await collect(engine.send(convo.id, "echo world"))
+
+    text = "".join(e.text for e in events if isinstance(e, TextDelta))
+    assert text == "Echoed: world"
+
+    # Verify tool was invoked
+    started = [e for e in events if isinstance(e, ToolCallStarted)]
+    assert len(started) == 1
+    assert started[0].call.name == "echo"
+
+    finished = [e for e in events if isinstance(e, TurnFinished)]
+    assert finished
+
+    # Verify storage has user, assistant (tool_calls), tool, assistant (final)
+    messages = await storage.get_messages(convo.id)
+    assert [m.role for m in messages] == ["user", "assistant", "tool", "assistant"]
+    assert messages[1].tool_calls[0].name == "echo"
+    assert messages[2].content == "echo: world"
+    assert messages[3].content == "Echoed: world"
+
+    # Verify requests sent to Anthropic
+    assert len(requests) == 2
+    # Request 2 includes the tool_result block in user turn
+    req2_turns = requests[1]["messages"]
+    assert req2_turns[-1]["role"] == "user"
+    assert req2_turns[-1]["content"][0]["type"] == "tool_result"
+    assert req2_turns[-1]["content"][0]["content"] == "echo: world"
+
